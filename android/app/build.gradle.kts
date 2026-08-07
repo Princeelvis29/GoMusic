@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.gomusic"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -19,7 +19,10 @@ android {
         applicationId = "com.example.gomusic"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        
+        // UPDATED: Set minSdk to 21 to support modern AdMob
+        minSdk = flutter.minSdkVersion 
+        
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -39,6 +39,7 @@ dependencies:
   on_audio_query: ^2.9.0
   permission_handler: ^13.0.0
   get_it: ^9.2.1
+  google_mobile_ads: ^5.1.0
 
 dev_dependencies:
   flutter_test:

@@ -7,8 +7,8 @@ plugins {
 android {
     namespace = "com.example.gomusic"
     
-    // FIXED: Reverted to Flutter's dynamic SDK version to prevent build machine crashes
-    compileSdk = flutter.compileSdkVersion 
+    // UPDATED: Hardcoded to 34 to satisfy on_audio_query_android dependency requirements
+    compileSdk = 34 
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

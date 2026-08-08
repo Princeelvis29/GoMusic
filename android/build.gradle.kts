@@ -16,7 +16,7 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-// 100% Bulletproof approach: Inject namespace instantly without afterEvaluate
+// Safely inject missing namespaces into older plugins
 subprojects {
     pluginManager.withPlugin("com.android.library") {
         val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
@@ -34,7 +34,7 @@ tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
 
-// Safely force Java 17 directly on the compile tasks without afterEvaluate
+// Safely force Java 17 directly on the compile tasks
 subprojects {
     // Force Java compatibility
     tasks.withType<JavaCompile>().configureEach {

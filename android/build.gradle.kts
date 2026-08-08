@@ -1,3 +1,5 @@
+import org.gradle.api.JavaVersion
+
 allprojects {
     repositories {
         google()
@@ -16,12 +18,34 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-// Safely inject missing namespaces into older plugins
+// THE ULTIMATE FIX: Align Namespaces, JVM Targets, and Compile SDK for all plugins
 subprojects {
+    // 1. Inject missing namespace for older plugins
     pluginManager.withPlugin("com.android.library") {
         val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
         if (androidExtension != null && androidExtension.namespace == null) {
             androidExtension.namespace = project.group.toString()
+        }
+    }
+
+    // 2. Force Java 17 and Compile SDK 34 directly in Android extensions
+    afterEvaluate {
+        val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+        if (androidExtension != null) {
+            // Force compileSdk to 34 to satisfy modern AndroidX dependencies
+            androidExtension.compileSdkVersion(34)
+            
+            androidExtension.compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+        }
+    }
+
+    // 3. Force Kotlin 17
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
 }
@@ -32,20 +56,4 @@ subprojects {
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
-}
-
-// Safely force Java 17 directly on the compile tasks
-subprojects {
-    // Force Java compatibility
-    tasks.withType<JavaCompile>().configureEach {
-        sourceCompatibility = "17"
-        targetCompatibility = "17"
-    }
-    
-    // Force Kotlin compatibility
-    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
 }

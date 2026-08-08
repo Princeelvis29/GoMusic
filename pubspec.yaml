@@ -37,7 +37,7 @@ dependencies:
   just_audio: ^0.10.6
   audio_service: ^0.18.19
   on_audio_query: ^2.9.0
-  permission_handler: ^13.0.0
+  permission_handler: 11.3.1
   get_it: ^9.2.1
   google_mobile_ads: ^9.0.0
 

@@ -18,7 +18,7 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-// THE ULTIMATE FIX: Align Namespaces, JVM Targets, and Compile SDK for all plugins
+// THE ULTIMATE FIX: Align Namespaces and JVM Targets for all plugins
 subprojects {
     // 1. Inject missing namespace for older plugins
     pluginManager.withPlugin("com.android.library") {
@@ -28,13 +28,10 @@ subprojects {
         }
     }
 
-    // 2. Force Java 17 and Compile SDK 34 directly in Android extensions
+    // 2. Force Java 17 directly in Android's compileOptions (Overrides Java 11)
     afterEvaluate {
         val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
         if (androidExtension != null) {
-            // Force compileSdk to 34 to satisfy modern AndroidX dependencies
-            androidExtension.compileSdkVersion(34)
-            
             androidExtension.compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_17
                 targetCompatibility = JavaVersion.VERSION_17

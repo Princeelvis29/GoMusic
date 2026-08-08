@@ -1,0 +1,18 @@
+workflows:
+  android-workflow:
+    name: Android Debug Build
+    max_build_duration: 120
+    environment:
+      flutter: stable
+    scripts:
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Fix Android SDK 37 folder name bug
+        script: |
+          ln -s /usr/local/share/android-sdk/platforms/android-37.0 /usr/local/share/android-sdk/platforms/android-37 || true
+      - name: Build Android App
+        script: |
+          flutter build apk --debug
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk

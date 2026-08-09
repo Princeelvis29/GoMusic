@@ -51,6 +51,9 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  
+  # Added the launcher icons package here
+  flutter_launcher_icons: ^0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -96,3 +99,11 @@ flutter:
   # Add this at the very bottom of pubspec.yaml
 dependency_overrides:
   sqflite_android: 2.4.1
+
+# Added the configuration for your new GoMusic logo
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app_icon.jpg"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/app_icon.jpg"

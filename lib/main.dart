@@ -344,7 +344,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   void _showFileInfo() {
     // Format bytes to MB safely
     String fileSize = "Unknown Size";
-    double mb = widget.song.size! / (1024 * 1024);
+    double mb = widget.song.size / (1024 * 1024);
     fileSize = "${mb.toStringAsFixed(2)} MB";
 
     showModalBottomSheet(

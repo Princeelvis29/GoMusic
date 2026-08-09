@@ -8,7 +8,7 @@ android {
     namespace = "com.example.gomusic"
     
     // UPDATED: Hardcoded to 34 to satisfy on_audio_query_android dependency requirements
-    compileSdk = 34 
+    compileSdk = 36 
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -23,7 +23,7 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         
         // FIXED: Hardcoded to 21 to guarantee AdMob compatibility
-        minSdk = 21 
+        minSdk = flutter.minSdkVersion 
         
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -35,6 +35,9 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            
+            // Add this line to read your new rules file!
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

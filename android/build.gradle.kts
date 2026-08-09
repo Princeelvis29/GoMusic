@@ -1,5 +1,4 @@
 import org.gradle.api.JavaVersion
-import com.android.build.gradle.BaseExtension
 
 allprojects {
     repositories {
@@ -19,27 +18,31 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
+// THE ULTIMATE FIX: Align Namespaces, JVM Targets, and Compile SDK 34
 subprojects {
+    // 1. Inject missing namespace for older plugins
+    pluginManager.withPlugin("com.android.library") {
+        val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+        if (androidExtension != null && androidExtension.namespace == null) {
+            androidExtension.namespace = project.group.toString()
+        }
+    }
+
+    // 2. Force Java 17 AND Compile SDK 34 directly (Fixes the sqflite crash)
     afterEvaluate {
-        val android = extensions.findByName("android") as? BaseExtension
-        if (android != null) {
-            // 1. Force API 34 on all legacy plugins
-            android.compileSdkVersion(34)
+        val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+        if (androidExtension != null) {
+            // This is the critical line that was missing:
+            androidExtension.compileSdkVersion(34)
             
-            // 2. Inject missing namespaces
-            if (android.namespace == null) {
-                android.namespace = project.group.toString()
-            }
-            
-            // 3. Force Java 17 for Android tasks
-            android.compileOptions {
+            androidExtension.compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_17
                 targetCompatibility = JavaVersion.VERSION_17
             }
         }
     }
-    
-    // 4. Force Kotlin 17
+
+    // 3. Force Kotlin 17
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)

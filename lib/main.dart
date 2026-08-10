@@ -172,11 +172,30 @@ class _SongListScreenState extends State<SongListScreen> {
                                 const PopupMenuItem<String>(value: 'share', child: Text('Share')),
                               ],
                             ),
-                            onTap: () {
+                            onTap: () async {
+                              // MAGIC HAPPENS HERE: Convert local MP3s to a queue and push to engine
+                              final audioHandler = getIt<AudioHandler>();
+                              
+                              final mediaItems = songs.map((s) => MediaItem(
+                                id: s.data, // just_audio needs the raw file path here
+                                title: s.title,
+                                artist: s.artist ?? "Unknown Artist",
+                                duration: Duration(milliseconds: s.duration ?? 0),
+                                extras: {
+                                  'id': s.id, // Save ID so NowPlayingScreen can grab artwork
+                                  'size': s.size,
+                                  'data': s.data,
+                                },
+                              )).toList();
+
+                              await audioHandler.updateQueue(mediaItems);
+                              await audioHandler.skipToQueueItem(index);
+                              await audioHandler.play();
+
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => NowPlayingScreen(song: song),
+                                  builder: (context) => const NowPlayingScreen(),
                                 ),
                               );
                             },
@@ -187,7 +206,6 @@ class _SongListScreenState extends State<SongListScreen> {
                   ),
           ),
           
-          // Render AdMob Banner at the bottom
           if (_isAdLoaded && _bannerAd != null)
             SafeArea(
               child: SizedBox(
@@ -203,49 +221,22 @@ class _SongListScreenState extends State<SongListScreen> {
 }
 
 class NowPlayingScreen extends StatefulWidget {
-  final SongModel song;
-
-  const NowPlayingScreen({super.key, required this.song});
+  const NowPlayingScreen({super.key});
 
   @override
   State<NowPlayingScreen> createState() => _NowPlayingScreenState();
 }
 
 class _NowPlayingScreenState extends State<NowPlayingScreen> {
-  bool _isPlaying = false;
-  double _progress = 0.0;
-  Timer? _timer;
+  final audioHandler = getIt<AudioHandler>();
   
   bool _isStarred = false;
   bool _isShuffle = false;
   bool _isRepeat = false;
   double _playbackSpeed = 1.0;
 
-  void _togglePlayPause() {
-    setState(() => _isPlaying = !_isPlaying);
-    if (_isPlaying) {
-      _timer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-        setState(() {
-          _progress += 0.02 * _playbackSpeed; 
-          if (_progress >= 1.0) {
-            _progress = 0.0; 
-            _isPlaying = false;
-            timer.cancel();
-          }
-        });
-      });
-    } else {
-      _timer?.cancel();
-    }
-  }
-
-  void _seek(double value) {
-    setState(() => _progress = value);
-  }
-
   @override
   void dispose() {
-    _timer?.cancel(); 
     super.dispose();
   }
 
@@ -341,10 +332,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     );
   }
 
-  void _showFileInfo() {
-    // Format bytes to MB safely
+  void _showFileInfo(MediaItem currentMedia) {
+    // Safely parse the original size injected from the home screen
     String fileSize = "Unknown Size";
-    double mb = widget.song.size / (1024 * 1024);
+    double mb = (currentMedia.extras?['size'] ?? 0) / (1024 * 1024);
     fileSize = "${mb.toStringAsFixed(2)} MB";
 
     showModalBottomSheet(
@@ -365,7 +356,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.song.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text(currentMedia.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                       Text(fileSize, style: const TextStyle(color: Colors.grey)),
                     ],
                   ),
@@ -375,9 +366,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
             const Divider(height: 40),
             _buildInfoRow("Kind", "MP3"),
             const SizedBox(height: 20),
-            _buildInfoRow("Location", widget.song.data),
+            _buildInfoRow("Location", currentMedia.extras?['data'] ?? "Unknown Location"),
             const SizedBox(height: 20),
-            _buildInfoRow("Artist", widget.song.artist ?? "Unknown Artist"),
+            _buildInfoRow("Artist", currentMedia.artist ?? "Unknown Artist"),
           ],
         ),
       ),
@@ -417,7 +408,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   inactiveColor: Colors.grey[800],
                   onChanged: (val) {
                     setModalState(() => _playbackSpeed = val); 
-                    setState(() => _playbackSpeed = val);      
+                    setState(() {
+                      _playbackSpeed = val;
+                      audioHandler.setSpeed(val);
+                    });      
                   },
                 ),
                 const Row(
@@ -438,120 +432,171 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.share, color: Colors.white), onPressed: _showShareMenu),
-          IconButton(
-            icon: Icon(_isStarred ? Icons.star : Icons.star_border, color: _isStarred ? Colors.amber : Colors.white),
-            onPressed: () {
-              setState(() => _isStarred = !_isStarred);
-              ScaffoldMessenger.of(context).clearSnackBars();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(_isStarred ? "Added to Starred" : "Removed from Starred"),
-                  duration: const Duration(seconds: 2),
-                  action: SnackBarAction(label: 'View', onPressed: () {}),
-                ),
-              );
-            },
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onSelected: (value) {
-              switch (value) {
-                case 'trash': _showTrashConfirmation(); break;
-                case 'move': _showStorageOptions('Move to'); break;
-                case 'copy': _showStorageOptions('Copy to'); break;
-                case 'info': _showFileInfo(); break;
-                case 'ringtone': ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("This song was set as your ringtone."))); break;
-                case 'speed': _showPlaybackSpeed(); break;
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(value: 'open_with', child: Text('Open with')),
-              const PopupMenuItem<String>(value: 'trash', child: Text('Move to Trash')),
-              const PopupMenuItem<String>(value: 'move', child: Text('Move to')),
-              const PopupMenuItem<String>(value: 'copy', child: Text('Copy to')),
-              const PopupMenuItem<String>(value: 'safe', child: Text('Move to Safe folder')),
-              const PopupMenuItem<String>(value: 'info', child: Text('File info')),
-              const PopupMenuItem<String>(value: 'ringtone', child: Text('Set as ringtone')),
-              const PopupMenuItem<String>(value: 'speed', child: Text('Playback speed')),
+    // The StreamBuilder constantly listens to the engine to fetch the exact song playing
+    return StreamBuilder<MediaItem?>(
+      stream: audioHandler.mediaItem,
+      builder: (context, snapshot) {
+        final mediaItem = snapshot.data;
+        if (mediaItem == null) {
+          return const Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        int? songId = mediaItem.extras?['id'] as int?;
+
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            actions: [
+              IconButton(icon: const Icon(Icons.share, color: Colors.white), onPressed: _showShareMenu),
+              IconButton(
+                icon: Icon(_isStarred ? Icons.star : Icons.star_border, color: _isStarred ? Colors.amber : Colors.white),
+                onPressed: () {
+                  setState(() => _isStarred = !_isStarred);
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(_isStarred ? "Added to Starred" : "Removed from Starred"),
+                      duration: const Duration(seconds: 2),
+                      action: SnackBarAction(label: 'View', onPressed: () {}),
+                    ),
+                  );
+                },
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'trash': _showTrashConfirmation(); break;
+                    case 'move': _showStorageOptions('Move to'); break;
+                    case 'copy': _showStorageOptions('Copy to'); break;
+                    case 'info': _showFileInfo(mediaItem); break;
+                    case 'ringtone': ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("This song was set as your ringtone."))); break;
+                    case 'speed': _showPlaybackSpeed(); break;
+                  }
+                },
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(value: 'open_with', child: Text('Open with')),
+                  const PopupMenuItem<String>(value: 'trash', child: Text('Move to Trash')),
+                  const PopupMenuItem<String>(value: 'move', child: Text('Move to')),
+                  const PopupMenuItem<String>(value: 'copy', child: Text('Copy to')),
+                  const PopupMenuItem<String>(value: 'safe', child: Text('Move to Safe folder')),
+                  const PopupMenuItem<String>(value: 'info', child: Text('File info')),
+                  const PopupMenuItem<String>(value: 'ringtone', child: Text('Set as ringtone')),
+                  const PopupMenuItem<String>(value: 'speed', child: Text('Playback speed')),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
-            child: Column(
-              children: [
-                Container(
-                  height: 320, width: 320,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[850],
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 10))],
-                  ),
-                  child: QueryArtworkWidget(
-                    id: widget.song.id,
-                    type: ArtworkType.AUDIO,
-                    artworkHeight: 320,
-                    artworkWidth: 320,
-                    nullArtworkWidget: const Icon(Icons.music_note, size: 120, color: Colors.blueAccent),
-                  ),
-                ),
-                const SizedBox(height: 40),
-                Text(widget.song.title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold), maxLines: 1),
-                const SizedBox(height: 8),
-                Text(widget.song.artist ?? "Unknown Artist", style: const TextStyle(fontSize: 18, color: Colors.grey)),
-                const SizedBox(height: 40),
-                SliderTheme(
-                  data: SliderThemeData(trackHeight: 4, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6)),
-                  child: Slider(
-                    value: _progress,
-                    onChanged: _seek,
-                    activeColor: Colors.blueAccent, inactiveColor: Colors.grey[800],
-                  ),
-                ),
-                const SizedBox(height: 30),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
+                child: Column(
                   children: [
-                    IconButton(
-                      iconSize: 28, color: _isShuffle ? Colors.blueAccent : Colors.grey[400],
-                      icon: const Icon(Icons.shuffle), onPressed: () => setState(() => _isShuffle = !_isShuffle),
-                    ),
-                    IconButton(
-                      iconSize: 40, color: Colors.white, icon: const Icon(Icons.skip_previous),
-                      onPressed: () => setState(() => _progress = 0.0),
-                    ),
-                    SizedBox(
-                      height: 70, width: 70,
-                      child: FloatingActionButton(
-                        elevation: 0, backgroundColor: Colors.blueAccent, foregroundColor: Colors.white,
-                        onPressed: _togglePlayPause, shape: const CircleBorder(),
-                        child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, size: 38),
+                    Container(
+                      height: 320, width: 320,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[850],
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 10))],
                       ),
+                      child: songId != null 
+                        ? QueryArtworkWidget(
+                            id: songId,
+                            type: ArtworkType.AUDIO,
+                            artworkHeight: 320,
+                            artworkWidth: 320,
+                            nullArtworkWidget: const Icon(Icons.music_note, size: 120, color: Colors.blueAccent),
+                          )
+                        : const Icon(Icons.music_note, size: 120, color: Colors.blueAccent),
                     ),
-                    IconButton(
-                      iconSize: 40, color: Colors.white, icon: const Icon(Icons.skip_next),
-                      onPressed: () => setState(() => _progress = 1.0),
+                    const SizedBox(height: 40),
+                    Text(mediaItem.title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold), maxLines: 1),
+                    const SizedBox(height: 8),
+                    Text(mediaItem.artist ?? "Unknown Artist", style: const TextStyle(fontSize: 18, color: Colors.grey)),
+                    const SizedBox(height: 40),
+                    
+                    // TRUE PROGRESS BAR: Listens directly to the engine output
+                    StreamBuilder<Duration>(
+                      stream: AudioService.position,
+                      builder: (context, positionSnapshot) {
+                        final position = positionSnapshot.data ?? Duration.zero;
+                        final duration = mediaItem.duration ?? Duration.zero;
+                        
+                        double progressValue = 0.0;
+                        if (duration.inMilliseconds > 0) {
+                          progressValue = (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+                        }
+
+                        return SliderTheme(
+                          data: SliderThemeData(trackHeight: 4, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6)),
+                          child: Slider(
+                            value: progressValue,
+                            onChanged: (val) {
+                              final newPosition = Duration(milliseconds: (val * duration.inMilliseconds).round());
+                              audioHandler.seek(newPosition);
+                            },
+                            activeColor: Colors.blueAccent, inactiveColor: Colors.grey[800],
+                          ),
+                        );
+                      }
                     ),
-                    IconButton(
-                      iconSize: 28, color: _isRepeat ? Colors.blueAccent : Colors.grey[400],
-                      icon: const Icon(Icons.repeat), onPressed: () => setState(() => _isRepeat = !_isRepeat),
+                    
+                    const SizedBox(height: 30),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        IconButton(
+                          iconSize: 28, color: _isShuffle ? Colors.blueAccent : Colors.grey[400],
+                          icon: const Icon(Icons.shuffle), onPressed: () => setState(() => _isShuffle = !_isShuffle),
+                        ),
+                        IconButton(
+                          iconSize: 40, color: Colors.white, icon: const Icon(Icons.skip_previous),
+                          onPressed: () => audioHandler.skipToPrevious(), // Connected to engine
+                        ),
+                        
+                        // TRUE PLAY/PAUSE: Evaluates if engine is actively playing
+                        StreamBuilder<PlaybackState>(
+                          stream: audioHandler.playbackState,
+                          builder: (context, stateSnapshot) {
+                            final playing = stateSnapshot.data?.playing ?? false;
+                            return SizedBox(
+                              height: 70, width: 70,
+                              child: FloatingActionButton(
+                                elevation: 0, backgroundColor: Colors.blueAccent, foregroundColor: Colors.white,
+                                onPressed: () {
+                                  if (playing) {
+                                    audioHandler.pause();
+                                  } else {
+                                    audioHandler.play();
+                                  }
+                                }, 
+                                shape: const CircleBorder(),
+                                child: Icon(playing ? Icons.pause : Icons.play_arrow, size: 38),
+                              ),
+                            );
+                          }
+                        ),
+                        
+                        IconButton(
+                          iconSize: 40, color: Colors.white, icon: const Icon(Icons.skip_next),
+                          onPressed: () => audioHandler.skipToNext(), // Connected to engine
+                        ),
+                        IconButton(
+                          iconSize: 28, color: _isRepeat ? Colors.blueAccent : Colors.grey[400],
+                          icon: const Icon(Icons.repeat), onPressed: () => setState(() => _isRepeat = !_isRepeat),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
+        );
+      }
+    }

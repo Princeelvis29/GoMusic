@@ -1,33 +1,47 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
-class MyAudioHandler extends BaseAudioHandler with SeekHandler {
-  final _player = AudioPlayer();
+class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
+  final AudioPlayer _player = AudioPlayer();
+  // Creates an empty playlist that we can dynamically push local files into
+  final ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: []);
 
   MyAudioHandler() {
-    // Listen to playback state changes and broadcast them to the system (lock screen)
-    _player.playbackEventStream.listen(_broadcastState);
-    _loadTestTrack(); // Load a track immediately for testing
+    _init();
   }
 
-  Future<void> _loadTestTrack() async {
-    final item = MediaItem(
-      id: 'test_track_1',
-      title: 'Royalty Free Test Track',
-      artist: 'Bensound',
-      album: 'Test Album',
-      artUri: Uri.parse('https://www.bensound.com/bensound-img/epic.jpg'),
-    );
-
-    mediaItem.add(item);
+  Future<void> _init() async {
+    // Broadcast playback state changes to the system lock screen
+    _player.playbackEventStream.listen(_broadcastState);
+    
+    // Listen to track changes to update the notification/lock screen details
+    _player.currentIndexStream.listen((index) {
+      if (index != null && queue.value.isNotEmpty && index < queue.value.length) {
+        mediaItem.add(queue.value[index]);
+      }
+    });
 
     try {
-      await _player.setAudioSource(AudioSource.uri(
-        Uri.parse('https://www.bensound.com/bensound-music/bensound-epic.mp3'),
-      ));
+      // Connect the empty playlist to the audio engine
+      await _player.setAudioSource(_playlist);
     } catch (e) {
-      print("Error loading audio source: $e");
+      print("Error initializing audio source: $e");
     }
+  }
+
+  /// Takes the list of local MP3s from the home screen and loads them into the engine
+  @override
+  Future<void> updateQueue(List<MediaItem> newQueue) async {
+    queue.add(newQueue);
+    
+    // Convert the incoming MediaItems into just_audio local file sources
+    final audioSources = newQueue.map((item) {
+      // We will pass the local file path as the item.id
+      return AudioSource.uri(Uri.parse(item.id), tag: item);
+    }).toList();
+    
+    await _playlist.clear();
+    await _playlist.addAll(audioSources);
   }
 
   @override
@@ -37,10 +51,29 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> pause() => _player.pause();
 
   @override
-  Future<void> stop() => _player.stop();
+  Future<void> stop() async {
+    await _player.stop();
+    return super.stop();
+  }
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);
+
+  /// Fires when the user taps Next on the lock screen or in the app
+  @override
+  Future<void> skipToNext() => _player.seekToNext();
+
+  /// Fires when the user taps Previous on the lock screen or in the app
+  @override
+  Future<void> skipToPrevious() => _player.seekToPrevious();
+
+  /// Allows jumping straight to a specific song in the playlist when tapped
+  @override
+  Future<void> skipToQueueItem(int index) async {
+    if (index < 0 || index >= _playlist.length) return;
+    await _player.seek(Duration.zero, index: index);
+    play();
+  }
 
   void _broadcastState(PlaybackEvent event) {
     playbackState.add(playbackState.value.copyWith(

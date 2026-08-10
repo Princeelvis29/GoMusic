@@ -19,8 +19,9 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3940256099942544~3347511713"/>
 
+        <!-- UPDATED ACTIVITY NAME FOR AUDIO_SERVICE -->
         <activity
-            android:name="com.example.gomusic.MainActivity"
+            android:name="com.ryanheise.audioservice.AudioServiceActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""

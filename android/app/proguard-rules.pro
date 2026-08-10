@@ -19,3 +19,7 @@
 
 # 4. Keep Google Mobile Ads (AdMob) classes just to be safe
 -keep class com.google.android.gms.ads.** { *; }
+
+# 5. Protect the main activity so audio_service can find the Flutter Engine via reflection
+-keep class com.example.gomusic.MainActivity { *; }
+-keep class * extends io.flutter.embedding.android.FlutterActivity { *; }

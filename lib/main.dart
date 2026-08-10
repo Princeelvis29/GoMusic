@@ -173,16 +173,15 @@ class _SongListScreenState extends State<SongListScreen> {
                               ],
                             ),
                             onTap: () async {
-                              // MAGIC HAPPENS HERE: Convert local MP3s to a queue and push to engine
                               final audioHandler = getIt<AudioHandler>();
                               
                               final mediaItems = songs.map((s) => MediaItem(
-                                id: s.data, // just_audio needs the raw file path here
+                                id: s.data,
                                 title: s.title,
                                 artist: s.artist ?? "Unknown Artist",
                                 duration: Duration(milliseconds: s.duration ?? 0),
                                 extras: {
-                                  'id': s.id, // Save ID so NowPlayingScreen can grab artwork
+                                  'id': s.id,
                                   'size': s.size,
                                   'data': s.data,
                                 },
@@ -192,12 +191,14 @@ class _SongListScreenState extends State<SongListScreen> {
                               await audioHandler.skipToQueueItem(index);
                               await audioHandler.play();
 
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const NowPlayingScreen(),
-                                ),
-                              );
+                              if (context.mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const NowPlayingScreen(),
+                                  ),
+                                );
+                              }
                             },
                           );
                         },
@@ -333,7 +334,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   }
 
   void _showFileInfo(MediaItem currentMedia) {
-    // Safely parse the original size injected from the home screen
     String fileSize = "Unknown Size";
     double mb = (currentMedia.extras?['size'] ?? 0) / (1024 * 1024);
     fileSize = "${mb.toStringAsFixed(2)} MB";
@@ -432,7 +432,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // The StreamBuilder constantly listens to the engine to fetch the exact song playing
     return StreamBuilder<MediaItem?>(
       stream: audioHandler.mediaItem,
       builder: (context, snapshot) {
@@ -520,7 +519,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                     Text(mediaItem.artist ?? "Unknown Artist", style: const TextStyle(fontSize: 18, color: Colors.grey)),
                     const SizedBox(height: 40),
                     
-                    // TRUE PROGRESS BAR: Listens directly to the engine output
                     StreamBuilder<Duration>(
                       stream: AudioService.position,
                       builder: (context, positionSnapshot) {
@@ -543,7 +541,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             activeColor: Colors.blueAccent, inactiveColor: Colors.grey[800],
                           ),
                         );
-                      }
+                      },
                     ),
                     
                     const SizedBox(height: 30),
@@ -556,10 +554,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         ),
                         IconButton(
                           iconSize: 40, color: Colors.white, icon: const Icon(Icons.skip_previous),
-                          onPressed: () => audioHandler.skipToPrevious(), // Connected to engine
+                          onPressed: () => audioHandler.skipToPrevious(),
                         ),
                         
-                        // TRUE PLAY/PAUSE: Evaluates if engine is actively playing
                         StreamBuilder<PlaybackState>(
                           stream: audioHandler.playbackState,
                           builder: (context, stateSnapshot) {
@@ -579,12 +576,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                 child: Icon(playing ? Icons.pause : Icons.play_arrow, size: 38),
                               ),
                             );
-                          }
+                          },
                         ),
                         
                         IconButton(
                           iconSize: 40, color: Colors.white, icon: const Icon(Icons.skip_next),
-                          onPressed: () => audioHandler.skipToNext(), // Connected to engine
+                          onPressed: () => audioHandler.skipToNext(),
                         ),
                         IconButton(
                           iconSize: 28, color: _isRepeat ? Colors.blueAccent : Colors.grey[400],
@@ -598,5 +595,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
             ),
           ),
         );
-      }
-    }
+      },
+    );
+  }
+}

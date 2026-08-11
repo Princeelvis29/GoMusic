@@ -17,6 +17,9 @@
     <!-- Added INTERNET permission required for AdMob to initialize without crashing -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Added permission required for All Files Access to scan SD Cards -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+
     <!-- Added usesCleartextTraffic to prevent Source Error crashes -->
     <application
         android:label="gomusic"

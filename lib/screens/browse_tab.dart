@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:permission_handler/permission_handler.dart';
 
 class BrowseTab extends StatefulWidget {
   const BrowseTab({super.key});
@@ -9,7 +10,6 @@ class BrowseTab extends StatefulWidget {
 }
 
 class _BrowseTabState extends State<BrowseTab> {
-  // CHANGED: Moved root up to /storage/ to catch both internal and external SD cards
   Directory _currentDir = Directory('/storage/');
   List<FileSystemEntity> _entities = [];
   bool _isLoading = true;
@@ -17,6 +17,14 @@ class _BrowseTabState extends State<BrowseTab> {
   @override
   void initState() {
     super.initState();
+    _requestPermissionsAndLoad();
+  }
+
+  Future<void> _requestPermissionsAndLoad() async {
+    // Request "All Files Access" for modern Android devices
+    if (await Permission.manageExternalStorage.isDenied) {
+      await Permission.manageExternalStorage.request();
+    }
     _loadDirectory();
   }
 
@@ -37,7 +45,13 @@ class _BrowseTabState extends State<BrowseTab> {
         _entities = [];
       }
     } catch (e) {
-      _entities = []; 
+      // FALLBACK: If the OS strictly blocks /storage/ listing via SELinux, 
+      // manually inject the Internal Memory path so it is never blank.
+      if (_currentDir.path == '/storage/' || _currentDir.path == '/storage') {
+        _entities = [Directory('/storage/emulated/0')];
+      } else {
+        _entities = []; 
+      }
     }
     
     if (mounted) {
@@ -46,7 +60,6 @@ class _BrowseTabState extends State<BrowseTab> {
   }
 
   void _goUp() {
-    // CHANGED: Prevent going higher than /storage/
     if (_currentDir.path != '/storage/' && _currentDir.path != '/storage') {
       setState(() {
         _currentDir = _currentDir.parent;
@@ -57,7 +70,6 @@ class _BrowseTabState extends State<BrowseTab> {
 
   @override
   Widget build(BuildContext context) {
-    // CHANGED: Check against the new root
     final isRoot = _currentDir.path == '/storage/' || _currentDir.path == '/storage';
     
     return Scaffold(
@@ -83,7 +95,14 @@ class _BrowseTabState extends State<BrowseTab> {
               itemBuilder: (context, index) {
                 final entity = _entities[index];
                 final isDir = entity is Directory;
-                final name = entity.path.split('/').last;
+                String name = entity.path.split('/').last;
+
+                // Clean up UI names for root directories
+                if (name == '0' && entity.path.contains('emulated')) {
+                  name = "Internal Storage";
+                } else if (name == 'emulated' || name == 'self') {
+                  return const SizedBox.shrink(); // Hide confusing system symlinks
+                }
                 
                 return ListTile(
                   leading: Icon(

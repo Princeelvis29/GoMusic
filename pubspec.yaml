@@ -40,6 +40,13 @@ dependencies:
   permission_handler: 11.3.1
   get_it: ^9.2.1
   google_mobile_ads: ^9.0.0
+  video_player: ^2.13.0
+  chewie: ^1.14.1
+  shared_preferences: ^2.5.5
+  simple_pip_mode: ^1.1.0
+  equalizer_flutter: ^0.0.1
+  sqflite: ^2.4.3
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:

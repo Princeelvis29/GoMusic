@@ -7,8 +7,8 @@ plugins {
 android {
     namespace = "com.example.gomusic"
     
-    // UPDATED: Hardcoded to 34 to satisfy dependency requirements
-    compileSdk = 34 
+    // UPDATED: Set to 35 to fix permission_handler SDK symbol compilation error
+    compileSdk = 35 
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -25,8 +25,8 @@ android {
         // FIXED: Hardcoded to guarantee AdMob compatibility (you can set to 21 if flutter.minSdkVersion is lower)
         minSdk = flutter.minSdkVersion 
         
-        // CHANGED: Explicitly set targetSdk to 34 for permission_handler support
-        targetSdk = 34
+        // CHANGED: Set targetSdk to 35 to match Android API support
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

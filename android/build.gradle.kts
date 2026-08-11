@@ -32,8 +32,8 @@ subprojects {
     afterEvaluate {
         val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
         if (androidExtension != null) {
-            // This is the critical line that was missing:
-            androidExtension.compileSdkVersion(36)
+            // CHANGED: Fixed the typo here from 36 down to 34 to match our Android 14 target!
+            androidExtension.compileSdkVersion(34)
             
             androidExtension.compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_17

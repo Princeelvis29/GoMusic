@@ -6,7 +6,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:equalizer_flutter/equalizer_flutter.dart';
 import '../main.dart'; 
-import '../services/database_helper.dart'; // NEW: Import the database helper
+import '../services/database_helper.dart'; 
 
 class SongListScreen extends StatefulWidget {
   const SongListScreen({super.key});
@@ -221,7 +221,6 @@ class _SongListScreenState extends State<SongListScreen> {
                               extras: {'id': s.id, 'size': s.size, 'data': s.data},
                             )).toList();
 
-                            // NEW: Log the song to SQLite history
                             await DatabaseHelper.instance.logPlay(song.title, song.artist ?? "Unknown Artist");
 
                             await audioHandler.updateQueue(mediaItems);
@@ -361,14 +360,87 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     super.dispose();
   }
 
+  // CHANGED: Fallback system if device blocks native intent
   void _showEqualizer() async {
     try {
       await EqualizerFlutter.open(0);
     } catch (e) {
+      _showCustomEqualizer();
+    }
+  }
+
+  // NEW: Builds a custom flutter UI using the hardware backend
+  void _showCustomEqualizer() async {
+    try {
+      await EqualizerFlutter.init(0);
+      final bands = await EqualizerFlutter.getBandLevelRange();
+      final min = bands[0].toDouble();
+      final max = bands[1].toDouble();
+      final freqs = await EqualizerFlutter.getCenterBandFreqs();
+      
+      List<double> currentLevels = [];
+      for (int i = 0; i < freqs.length; i++) {
+        int level = await EqualizerFlutter.getBandLevel(i);
+        currentLevels.add(level.toDouble());
+      }
+
+      if (!mounted) return;
+
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (BuildContext context, StateSetter setModalState) {
+              return Container(
+                padding: const EdgeInsets.all(24),
+                height: 350,
+                child: Column(
+                  children: [
+                    const Text("Custom Equalizer", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 20),
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: List.generate(freqs.length, (idx) {
+                          return Column(
+                            children: [
+                              Expanded(
+                                child: RotatedBox(
+                                  quarterTurns: 3,
+                                  child: Slider(
+                                    value: currentLevels[idx].clamp(min, max),
+                                    min: min,
+                                    max: max,
+                                    activeColor: Colors.deepOrange,
+                                    inactiveColor: Colors.grey[800],
+                                    onChanged: (val) {
+                                      setModalState(() {
+                                        currentLevels[idx] = val;
+                                      });
+                                      EqualizerFlutter.setBandLevel(idx, val.toInt());
+                                    },
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text("${(freqs[idx] / 1000).toStringAsFixed(0)}k", style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                            ],
+                          );
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          );
+        },
+      );
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("No native equalizer found on this device.")),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Hardware equalizer completely blocked by OS.")));
       }
     }
   }

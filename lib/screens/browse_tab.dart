@@ -9,7 +9,8 @@ class BrowseTab extends StatefulWidget {
 }
 
 class _BrowseTabState extends State<BrowseTab> {
-  Directory _currentDir = Directory('/storage/emulated/0/');
+  // CHANGED: Moved root up to /storage/ to catch both internal and external SD cards
+  Directory _currentDir = Directory('/storage/');
   List<FileSystemEntity> _entities = [];
   bool _isLoading = true;
 
@@ -25,7 +26,6 @@ class _BrowseTabState extends State<BrowseTab> {
       if (await _currentDir.exists()) {
         _entities = _currentDir.listSync(followLinks: false).toList();
         
-        // Sort: Directories at the top, then files alphabetically
         _entities.sort((a, b) {
           final aIsDir = a is Directory;
           final bIsDir = b is Directory;
@@ -46,7 +46,8 @@ class _BrowseTabState extends State<BrowseTab> {
   }
 
   void _goUp() {
-    if (_currentDir.path != '/storage/emulated/0/' && _currentDir.path != '/storage/emulated/0') {
+    // CHANGED: Prevent going higher than /storage/
+    if (_currentDir.path != '/storage/' && _currentDir.path != '/storage') {
       setState(() {
         _currentDir = _currentDir.parent;
       });
@@ -56,12 +57,13 @@ class _BrowseTabState extends State<BrowseTab> {
 
   @override
   Widget build(BuildContext context) {
-    final isRoot = _currentDir.path == '/storage/emulated/0/' || _currentDir.path == '/storage/emulated/0';
+    // CHANGED: Check against the new root
+    final isRoot = _currentDir.path == '/storage/' || _currentDir.path == '/storage';
     
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          isRoot ? "Internal Memory" : _currentDir.path.split('/').last,
+          isRoot ? "Storage Volumes" : _currentDir.path.split('/').last,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF1E1E1E),

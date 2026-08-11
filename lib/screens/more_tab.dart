@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/database_helper.dart'; // NEW: Import the database helper
+import '../services/database_helper.dart'; 
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -62,7 +62,7 @@ class _MoreTabState extends State<MoreTab> {
                           child: const Icon(Icons.music_note, size: 40, color: Colors.white),
                         ),
                         children: [
-                          const Text("GoMusic is a port of popular open source media player interfaces. The Android version can read all local files and directories."),
+                          const Text("GoMusic is a powerful media player designed for your pleasure and comfort. The Android version can read all local files and directories.\n\nPowered and Developed by Arktech Solutions\nhttps://arktechsolution.top"),
                         ]
                       );
                     },
@@ -99,7 +99,6 @@ class _MoreTabState extends State<MoreTab> {
             ),
             const SizedBox(height: 16),
             
-            // NEW: FutureBuilder to fetch and display SQLite history
             FutureBuilder<List<Map<String, dynamic>>>(
               future: DatabaseHelper.instance.getHistory(),
               builder: (context, snapshot) {
@@ -116,7 +115,7 @@ class _MoreTabState extends State<MoreTab> {
                 final history = snapshot.data!;
                 return ListView.builder(
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(), // Disables scrolling so it flows with the main view
+                  physics: const NeverScrollableScrollPhysics(), 
                   itemCount: history.length,
                   itemBuilder: (context, index) {
                     final item = history[index];

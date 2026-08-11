@@ -18,7 +18,7 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-// THE ULTIMATE FIX: Align Namespaces, JVM Targets, and Compile SDK 34
+// THE ULTIMATE FIX: Align Namespaces, JVM Targets, and Compile SDK 37
 subprojects {
     // 1. Inject missing namespace for older plugins
     pluginManager.withPlugin("com.android.library") {
@@ -28,12 +28,12 @@ subprojects {
         }
     }
 
-    // 2. Force Java 17 AND Compile SDK 34 directly (Fixes the sqflite crash)
+    // 2. Force Java 17 AND Compile SDK 37 directly (Fixes the permission_handler crash)
     afterEvaluate {
         val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
         if (androidExtension != null) {
-            // CHANGED: Fixed the typo here from 36 down to 34 to match our Android 14 target!
-            androidExtension.compileSdkVersion(34)
+            // CHANGED: Bumped from 34 to 37 to support the latest permission_handler API requirements
+            androidExtension.compileSdkVersion(37)
             
             androidExtension.compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_17

@@ -62,6 +62,7 @@ class _MoreTabState extends State<MoreTab> {
                           child: const Icon(Icons.music_note, size: 40, color: Colors.white),
                         ),
                         children: [
+                          // CHANGED: Trademark and URL directly integrated
                           const Text("GoMusic is a powerful media player designed for your pleasure and comfort. The Android version can read all local files and directories.\n\nPowered and Developed by Arktech Solutions\nhttps://arktechsolution.top"),
                         ]
                       );

@@ -369,7 +369,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     }
   }
 
-  // NEW: Builds a custom flutter UI using the hardware backend
+  // NEW: Builds a custom flutter UI mapped directly to the hardware backend
   void _showCustomEqualizer() async {
     try {
       await EqualizerFlutter.init(0);
@@ -404,6 +404,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: List.generate(freqs.length, (idx) {
+                          int freqHz = freqs[idx] ~/ 1000;
+                          String label = freqHz >= 1000 ? "${(freqHz / 1000).toStringAsFixed(1)}k" : "$freqHz";
                           return Column(
                             children: [
                               Expanded(
@@ -425,7 +427,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              Text("${(freqs[idx] / 1000).toStringAsFixed(0)}k", style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                              Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
                             ],
                           );
                         }),

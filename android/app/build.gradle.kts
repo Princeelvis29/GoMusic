@@ -7,8 +7,8 @@ plugins {
 android {
     namespace = "com.example.gomusic"
     
-    // UPDATED: Hardcoded to 34 to satisfy on_audio_query_android dependency requirements
-    compileSdk = 36 
+    // UPDATED: Hardcoded to 34 to satisfy dependency requirements
+    compileSdk = 34 
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -22,10 +22,11 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         
-        // FIXED: Hardcoded to 21 to guarantee AdMob compatibility
+        // FIXED: Hardcoded to guarantee AdMob compatibility (you can set to 21 if flutter.minSdkVersion is lower)
         minSdk = flutter.minSdkVersion 
         
-        targetSdk = flutter.targetSdkVersion
+        // CHANGED: Explicitly set targetSdk to 34 for permission_handler support
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

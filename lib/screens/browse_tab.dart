@@ -28,10 +28,69 @@ class _BrowseTabState extends State<BrowseTab> {
     _loadDirectory();
   }
 
+  // Parses Android system files to locate connected SD Cards
+  Future<List<FileSystemEntity>> _getStorageVolumes() async {
+    List<FileSystemEntity> volumes = [];
+    
+    // 1. Always ensure Internal Storage is available
+    volumes.add(Directory('/storage/emulated/0'));
+    
+    // 2. Parse /proc/mounts to find the physical SD Card and bypass SELinux root blocks
+    try {
+      final mountsFile = File('/proc/mounts');
+      if (mountsFile.existsSync()) {
+        final lines = mountsFile.readAsLinesSync();
+        for (var line in lines) {
+          // Check for standard external filesystem formats
+          if (line.contains('/storage/') && 
+             (line.contains('vfat') || line.contains('exfat') || line.contains('sdcardfs') || line.contains('fuse'))) {
+            final parts = line.split(' ');
+            for (var part in parts) {
+              // Extract the true SD card path and ignore internal symlinks
+              if (part.startsWith('/storage/') && !part.contains('emulated') && !part.contains('self')) {
+                final dir = Directory(part);
+                if (dir.existsSync()) {
+                  volumes.add(dir);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Mount parse error: $e");
+    }
+
+    // 3. Fallback to listSync if /proc/mounts is completely restricted
+    if (volumes.length == 1) {
+      try {
+        final dirs = Directory('/storage/').listSync();
+        for (var dir in dirs) {
+          if (dir.path != '/storage/emulated' && dir.path != '/storage/self') {
+             volumes.add(dir);
+          }
+        }
+      } catch (e) {
+         debugPrint("Root list error: $e");
+      }
+    }
+    
+    // 4. Deduplicate volumes by absolute path just in case
+    final seen = <String>{};
+    volumes.retainWhere((v) => seen.add(v.path));
+    
+    return volumes;
+  }
+
   Future<void> _loadDirectory() async {
     setState(() => _isLoading = true);
+    
+    final isRoot = _currentDir.path == '/storage/' || _currentDir.path == '/storage';
+    
     try {
-      if (await _currentDir.exists()) {
+      if (isRoot) {
+        _entities = await _getStorageVolumes();
+      } else if (await _currentDir.exists()) {
         _entities = _currentDir.listSync(followLinks: false).toList();
         
         _entities.sort((a, b) {
@@ -45,13 +104,7 @@ class _BrowseTabState extends State<BrowseTab> {
         _entities = [];
       }
     } catch (e) {
-      // FALLBACK: If the OS strictly blocks /storage/ listing via SELinux, 
-      // manually inject the Internal Memory path so it is never blank.
-      if (_currentDir.path == '/storage/' || _currentDir.path == '/storage') {
-        _entities = [Directory('/storage/emulated/0')];
-      } else {
-        _entities = []; 
-      }
+      _entities = []; 
     }
     
     if (mounted) {
@@ -98,10 +151,17 @@ class _BrowseTabState extends State<BrowseTab> {
                 String name = entity.path.split('/').last;
 
                 // Clean up UI names for root directories
-                if (name == '0' && entity.path.contains('emulated')) {
-                  name = "Internal Storage";
-                } else if (name == 'emulated' || name == 'self') {
-                  return const SizedBox.shrink(); // Hide confusing system symlinks
+                if (isRoot) {
+                  if (entity.path == '/storage/emulated/0') {
+                    name = "Internal Storage";
+                  } else {
+                    name = "SD Card ($name)";
+                  }
+                } else {
+                  // Hide confusing system symlinks when browsing normally
+                  if (name == 'emulated' || name == 'self') {
+                    return const SizedBox.shrink(); 
+                  }
                 }
                 
                 return ListTile(

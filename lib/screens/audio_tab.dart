@@ -23,6 +23,11 @@ class _SongListScreenState extends State<SongListScreen> {
   bool _isAdLoaded = false;
   final String _adUnitId = 'ca-app-pub-3940256099942544/6300978111'; 
 
+  // Search state variables
+  bool _isSearching = false;
+  String _searchQuery = "";
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +66,7 @@ class _SongListScreenState extends State<SongListScreen> {
   @override
   void dispose() {
     _bannerAd?.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -189,7 +195,17 @@ class _SongListScreenState extends State<SongListScreen> {
                     if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
                     if (snapshot.data == null || snapshot.data!.isEmpty) return const Center(child: Text("No MP3 files found on this device."));
 
-                    final songs = snapshot.data!;
+                    // Apply the search filter here
+                    final allSongs = snapshot.data!;
+                    final songs = _searchQuery.isEmpty 
+                        ? allSongs 
+                        : allSongs.where((song) => 
+                            song.title.toLowerCase().contains(_searchQuery.toLowerCase()) || 
+                            (song.artist?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false)
+                          ).toList();
+
+                    if (songs.isEmpty) return const Center(child: Text("No matches found."));
+
                     return ListView.builder(
                       itemCount: songs.length,
                       itemBuilder: (context, index) {
@@ -291,9 +307,41 @@ class _SongListScreenState extends State<SongListScreen> {
       initialIndex: 2, 
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Audio', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: _isSearching
+              ? TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: "Search music...",
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(color: Colors.white54),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                )
+              : const Text('Audio', style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: const Color(0xFF1E1E1E), 
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: Icon(_isSearching ? Icons.close : Icons.search),
+              onPressed: () {
+                setState(() {
+                  if (_isSearching) {
+                    _isSearching = false;
+                    _searchQuery = "";
+                    _searchController.clear();
+                  } else {
+                    _isSearching = true;
+                  }
+                });
+              },
+            )
+          ],
           bottom: const TabBar(
             isScrollable: true, 
             indicatorColor: Colors.deepOrange, 
@@ -360,7 +408,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     super.dispose();
   }
 
-  // CHANGED: Fallback system if device blocks native intent
+  // Fallback system if device blocks native intent
   void _showEqualizer() async {
     try {
       await EqualizerFlutter.open(0);
@@ -369,7 +417,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     }
   }
 
-  // NEW: Builds a custom flutter UI mapped directly to the hardware backend
+  // Builds a custom flutter UI mapped directly to the hardware backend
   void _showCustomEqualizer() async {
     try {
       await EqualizerFlutter.init(0);

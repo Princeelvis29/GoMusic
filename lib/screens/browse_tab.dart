@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:audio_service/audio_service.dart';
+import '../main.dart'; 
+import '../services/database_helper.dart';
+import 'audio_tab.dart'; // Required to navigate to the NowPlayingScreen
 
 class BrowseTab extends StatefulWidget {
   const BrowseTab({super.key});
@@ -21,32 +25,26 @@ class _BrowseTabState extends State<BrowseTab> {
   }
 
   Future<void> _requestPermissionsAndLoad() async {
-    // Request "All Files Access" for modern Android devices
     if (await Permission.manageExternalStorage.isDenied) {
       await Permission.manageExternalStorage.request();
     }
     _loadDirectory();
   }
 
-  // Parses Android system files to locate connected SD Cards
   Future<List<FileSystemEntity>> _getStorageVolumes() async {
     List<FileSystemEntity> volumes = [];
     
-    // 1. Always ensure Internal Storage is available
     volumes.add(Directory('/storage/emulated/0'));
     
-    // 2. Parse /proc/mounts to find the physical SD Card and bypass SELinux root blocks
     try {
       final mountsFile = File('/proc/mounts');
       if (mountsFile.existsSync()) {
         final lines = mountsFile.readAsLinesSync();
         for (var line in lines) {
-          // Check for standard external filesystem formats
           if (line.contains('/storage/') && 
              (line.contains('vfat') || line.contains('exfat') || line.contains('sdcardfs') || line.contains('fuse'))) {
             final parts = line.split(' ');
             for (var part in parts) {
-              // Extract the true SD card path and ignore internal symlinks
               if (part.startsWith('/storage/') && !part.contains('emulated') && !part.contains('self')) {
                 final dir = Directory(part);
                 if (dir.existsSync()) {
@@ -61,7 +59,6 @@ class _BrowseTabState extends State<BrowseTab> {
       debugPrint("Mount parse error: $e");
     }
 
-    // 3. Fallback to listSync if /proc/mounts is completely restricted
     if (volumes.length == 1) {
       try {
         final dirs = Directory('/storage/').listSync();
@@ -75,7 +72,6 @@ class _BrowseTabState extends State<BrowseTab> {
       }
     }
     
-    // 4. Deduplicate volumes by absolute path just in case
     final seen = <String>{};
     volumes.retainWhere((v) => seen.add(v.path));
     
@@ -150,7 +146,6 @@ class _BrowseTabState extends State<BrowseTab> {
                 final isDir = entity is Directory;
                 String name = entity.path.split('/').last;
 
-                // Clean up UI names for root directories
                 if (isRoot) {
                   if (entity.path == '/storage/emulated/0') {
                     name = "Internal Storage";
@@ -158,7 +153,6 @@ class _BrowseTabState extends State<BrowseTab> {
                     name = "SD Card ($name)";
                   }
                 } else {
-                  // Hide confusing system symlinks when browsing normally
                   if (name == 'emulated' || name == 'self') {
                     return const SizedBox.shrink(); 
                   }
@@ -171,16 +165,64 @@ class _BrowseTabState extends State<BrowseTab> {
                     size: 40,
                   ),
                   title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  onTap: () {
+                  onTap: () async {
                     if (isDir) {
                       setState(() {
                         _currentDir = Directory(entity.path);
                       });
                       _loadDirectory();
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Selected: $name")),
-                      );
+                      // Check if the selected file is a supported audio format
+                      final ext = name.toLowerCase();
+                      if (ext.endsWith('.mp3') || ext.endsWith('.m4a') || ext.endsWith('.wav') || ext.endsWith('.aac') || ext.endsWith('.flac')) {
+                        try {
+                          final audioHandler = getIt<AudioHandler>();
+                          
+                          // Gather all audio files in the current folder to create a queue
+                          final allAudioFiles = _entities.where((e) {
+                            final n = e.path.toLowerCase();
+                            return e is File && (n.endsWith('.mp3') || n.endsWith('.m4a') || n.endsWith('.wav') || n.endsWith('.aac') || n.endsWith('.flac'));
+                          }).toList();
+                          
+                          // Convert them into MediaItems
+                          final mediaItems = allAudioFiles.map((f) {
+                            final fileName = f.path.split('/').last;
+                            final cleanTitle = fileName.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), ''); // Strip extension
+                            return MediaItem(
+                              id: f.path, // Use physical file path as ID
+                              title: cleanTitle,
+                              artist: "Local File",
+                              extras: {'data': f.path},
+                            );
+                          }).toList();
+                          
+                          // Find the index of the file we just tapped
+                          final initialIndex = allAudioFiles.indexWhere((f) => f.path == entity.path);
+                          
+                          final tappedTitle = name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
+                          await DatabaseHelper.instance.logPlay(tappedTitle, "Local File");
+                          
+                          // Update queue and play
+                          await audioHandler.updateQueue(mediaItems);
+                          await audioHandler.skipToQueueItem(initialIndex >= 0 ? initialIndex : 0);
+                          await audioHandler.play();
+
+                          if (context.mounted) {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => const NowPlayingScreen()));
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("Error playing file: $e")),
+                            );
+                          }
+                        }
+                      } else {
+                        // Not an audio file
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Format not supported: $name")),
+                        );
+                      }
                     }
                   },
                 );

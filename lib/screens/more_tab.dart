@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/database_helper.dart'; 
+import 'settings_screen.dart'; // Added import for the new screen
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -35,9 +36,14 @@ class _MoreTabState extends State<MoreTab> {
                     icon: const Icon(Icons.settings),
                     label: const Text("SETTINGS"),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Settings menu coming soon")),
-                      );
+                      // Navigate to SettingsScreen and refresh when returning
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                      ).then((_) {
+                        // This forces the history list to rebuild if cleared in settings
+                        setState(() {}); 
+                      });
                     },
                   ),
                 ),
@@ -62,7 +68,6 @@ class _MoreTabState extends State<MoreTab> {
                           child: const Icon(Icons.music_note, size: 40, color: Colors.white),
                         ),
                         children: [
-                          // CHANGED: Trademark and URL directly integrated
                           const Text("GoMusic is a powerful media player designed for your pleasure and comfort. The Android version can read all local files and directories.\n\nPowered and Developed by Arktech Solutions\nhttps://arktechsolution.top"),
                         ]
                       );

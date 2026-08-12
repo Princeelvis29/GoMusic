@@ -18,9 +18,7 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-// THE ULTIMATE FIX: Align Namespaces, JVM Targets, and Compile SDK 37
 subprojects {
-    // 1. Inject missing namespace for older plugins
     pluginManager.withPlugin("com.android.library") {
         val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
         if (androidExtension != null && androidExtension.namespace == null) {
@@ -28,12 +26,10 @@ subprojects {
         }
     }
 
-    // 2. Force Java 17 AND Compile SDK 37 directly (Fixes the permission_handler crash)
     afterEvaluate {
         val androidExtension = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
         if (androidExtension != null) {
-            // CHANGED: Bumped from 34 to 37 to support the latest permission_handler API requirements
-            androidExtension.compileSdkVersion(37)
+            androidExtension.compileSdkVersion(36)
             
             androidExtension.compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_17
@@ -42,7 +38,6 @@ subprojects {
         }
     }
 
-    // 3. Force Kotlin 17
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
